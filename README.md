@@ -2,6 +2,13 @@
 
 True P2P voice- and video phone calls without the need for accounts or access to the Internet. There is no discovery mechanism, no meshing and no servers. Just scan each others QR-Code that will contain the contacts IP address. This works in many off-the-grid networks such as community mesh networks but also in company networks or at home.
 
+******
+
+在原工程上，增加screen share屏幕分享+h265硬编码设置的功能，增加了使用系统内部audio录制(非麦克风)。
+实现方式：业务层使用 ForegroundService + mediaProjection + AudioRecord 录制system audio，不修改webrtc sdk源码。
+******
+
+
 Features:
 
 - voice and video calls

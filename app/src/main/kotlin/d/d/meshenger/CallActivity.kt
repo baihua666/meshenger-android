@@ -1,14 +1,16 @@
 package d.d.meshenger
 
+//import d.d.meshenger.call.*
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.*
 import android.media.AudioManager
 import android.media.Ringtone
 import android.media.RingtoneManager
+import android.media.projection.MediaProjection
+import android.media.projection.MediaProjectionManager
 import android.os.*
 import android.os.PowerManager.WakeLock
-import android.text.Layout
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager.LayoutParams
@@ -16,8 +18,13 @@ import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.core.content.res.ResourcesCompat
-import d.d.meshenger.call.*
+import d.d.meshenger.call.CaptureQualityController
+import d.d.meshenger.call.RTCAudioManager
+import d.d.meshenger.call.RTCCall
+import d.d.meshenger.call.RTCPeerConnection
 import d.d.meshenger.call.RTCPeerConnection.CallState
+import d.d.meshenger.call.RTCProximitySensor
+import d.d.meshenger.call.StatsReportUtil
 import org.webrtc.*
 import java.net.InetSocketAddress
 import java.util.*
@@ -75,6 +82,10 @@ class CallActivity : BaseActivity(), RTCCall.CallContext {
     // set by RTCall
     private var isLocalVideoAvailable = false // own camera is on/off
     private var isRemoteVideoAvailable = false // we receive a video feed
+
+    //camera if false
+    private val isScreencast = true
+    private var screenCapturerManager: ScreenCapturerManager? = null
 
     private val statsCollector = object : RTCStatsCollectorCallback {
         var statsReportUtil = StatsReportUtil()
@@ -494,8 +505,16 @@ class CallActivity : BaseActivity(), RTCCall.CallContext {
                 finish()
             }
         }
+
+        if (isScreencast) {
+            if (android.os.Build.VERSION.SDK_INT >= 29 && screenCapturerManager == null) {
+                screenCapturerManager =
+                    ScreenCapturerManager(this)
+            }
+        }
     }
 
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     private fun initOutgoingCall() {
         connection = object : ServiceConnection {
             override fun onServiceConnected(componentName: ComponentName, iBinder: IBinder) {
@@ -540,23 +559,12 @@ class CallActivity : BaseActivity(), RTCCall.CallContext {
 
         val startCallListener = View.OnClickListener {
             Log.d(this, "start call...")
-            if (!this::currentCall.isInitialized) {
-                Log.d(this, "currentCall not set")
+
+            if (isScreencast) {
+                permissionCheckForProjection()
                 return@OnClickListener
             }
-
-            currentCall.setRemoteRenderer(remoteProxyVideoSink)
-            currentCall.setLocalRenderer(localProxyVideoSink)
-            currentCall.setEglBase(eglBase)
-            currentCall.setCallContext(this@CallActivity)
-
-            currentCall.initVideo()
-            currentCall.initOutgoing()
-
-            acceptButton.visibility = View.GONE
-            declineButton.visibility = View.VISIBLE
-
-            initCall()
+            initCallBase()
         }
 
         acceptButton.visibility = View.VISIBLE
@@ -564,6 +572,26 @@ class CallActivity : BaseActivity(), RTCCall.CallContext {
 
         acceptButton.setOnClickListener(startCallListener)
         declineButton.setOnClickListener(declineListener)
+    }
+
+    private fun initCallBase(isScreencast : Boolean = false, projectionResultData: Intent? = null, mediaProjection: MediaProjection? = null) {
+        if (!this::currentCall.isInitialized) {
+            Log.d(this, "currentCall not set")
+            return
+        }
+
+        currentCall.setRemoteRenderer(remoteProxyVideoSink)
+        currentCall.setLocalRenderer(localProxyVideoSink)
+        currentCall.setEglBase(eglBase)
+        currentCall.setCallContext(this@CallActivity)
+
+        currentCall.initVideo(mediaProjection)
+        currentCall.initOutgoing(isScreencast, projectionResultData)
+
+        acceptButton.visibility = View.GONE
+        declineButton.visibility = View.VISIBLE
+
+        initCall()
     }
 
     private fun initIncomingCall() {
@@ -1070,4 +1098,35 @@ class CallActivity : BaseActivity(), RTCCall.CallContext {
         @Volatile
         public var isCallInProgress: Boolean = false
     }
+
+    private val PROJECTION_REQUEST_CODE = 100
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+    private fun permissionCheckForProjection() {
+        val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        val intent = projectionManager.createScreenCaptureIntent()
+        startActivityForResult(intent, PROJECTION_REQUEST_CODE)
+    }
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != PROJECTION_REQUEST_CODE) {
+            Toast.makeText(this, "unknow request code: $requestCode", Toast.LENGTH_SHORT)
+            return
+        }
+        if (resultCode != RESULT_OK) {
+            Toast.makeText(this, "permission denied !", Toast.LENGTH_SHORT)
+            return
+        }
+        screenCapturerManager!!.startForeground()
+
+        val mediaProjectionManager = baseContext
+            .getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        val mediaProjection = mediaProjectionManager.getMediaProjection(
+            resultCode,
+            Objects.requireNonNull<Intent>(data)
+        )
+        initCallBase(true, data, mediaProjection)
+    }
+
+
 }

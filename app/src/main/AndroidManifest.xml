@@ -31,6 +31,9 @@
     <!-- Allow the app to start on device bootup -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- If your app targets Android 14 (API level 34) or higher, make sure you also apply for the FOREGROUND_SERVICE_MEDIA_PROJECTION permission to avoid security exception. Add the following line:  -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -100,5 +103,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
+
+        <service
+            android:enabled="true"
+            android:name=".ScreenCapturerService"
+            android:foregroundServiceType="mediaProjection">
+        </service>
     </application>
 </manifest>

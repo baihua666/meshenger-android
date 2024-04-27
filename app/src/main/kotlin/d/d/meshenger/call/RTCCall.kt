@@ -1,21 +1,59 @@
 package d.d.meshenger.call
 
 import android.content.Context
-import d.d.meshenger.*
+import android.content.Intent
+import android.media.projection.MediaProjection
+import d.d.meshenger.Contact
+import d.d.meshenger.Crypto
+import d.d.meshenger.Log
+import d.d.meshenger.MainService
+import d.d.meshenger.Utils
 import org.json.JSONException
 import org.json.JSONObject
-import org.webrtc.*
+import org.webrtc.AudioSource
+import org.webrtc.AudioTrack
+import org.webrtc.Camera1Enumerator
 import org.webrtc.CameraEnumerationAndroid.CaptureFormat
-import org.webrtc.PeerConnection.*
+import org.webrtc.CameraVideoCapturer
+import org.webrtc.DataChannel
+import org.webrtc.DefaultVideoDecoderFactory
+import org.webrtc.EglBase
+import org.webrtc.HardwareExtendedVideoEncoderFactory
+import org.webrtc.MediaConstraints
+import org.webrtc.MediaStream
+import org.webrtc.PeerConnection
+import org.webrtc.PeerConnection.ContinualGatheringPolicy
+import org.webrtc.PeerConnection.IceConnectionState
+import org.webrtc.PeerConnection.IceGatheringState
+import org.webrtc.PeerConnection.PeerConnectionState
+import org.webrtc.PeerConnection.RTCConfiguration
+import org.webrtc.PeerConnection.SdpSemantics
+import org.webrtc.PeerConnectionFactory
+import org.webrtc.RTCStatsCollectorCallback
+import org.webrtc.RtpParameters
+import org.webrtc.ScreenCapturerAndroid
+import org.webrtc.SessionDescription
+import org.webrtc.SoftwareVideoDecoderFactory
+import org.webrtc.SoftwareVideoEncoderFactory
+import org.webrtc.SurfaceTextureHelper
+import org.webrtc.VideoCapturer
+import org.webrtc.VideoDecoderFactory
+import org.webrtc.VideoEncoderFactory
+import org.webrtc.VideoFrame
+import org.webrtc.VideoSink
+import org.webrtc.VideoSource
+import org.webrtc.VideoTrack
 import org.webrtc.audio.AudioDeviceModule
 import org.webrtc.audio.JavaAudioDeviceModule
 import org.webrtc.audio.JavaAudioDeviceModule.AudioRecordErrorCallback
 import org.webrtc.audio.JavaAudioDeviceModule.AudioRecordStateCallback
 import org.webrtc.audio.JavaAudioDeviceModule.AudioTrackErrorCallback
 import org.webrtc.audio.JavaAudioDeviceModule.AudioTrackStateCallback
-import java.net.*
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.nio.ByteBuffer
-import java.util.*
+import java.util.Timer
+import java.util.TimerTask
 
 class RTCCall : RTCPeerConnection {
     private lateinit var factory: PeerConnectionFactory
@@ -88,6 +126,10 @@ class RTCCall : RTCPeerConnection {
                 if (sendOnDataChannel(obj.toString())) {
                     if (enabled) {
                         // start with hard default settings
+//                        var activity = callActivity?.getContext() as AppCompatActivity
+//                        activity.runOnUiThread {
+//                            videoCapturer!!.startCapture(DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_FRAMERATE)
+//                        }
                         videoCapturer!!.startCapture(DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_FRAMERATE)
                         callActivity!!.onLocalVideoEnabled(true)
                         callActivity!!.onCameraChanged()
@@ -245,7 +287,7 @@ class RTCCall : RTCPeerConnection {
         audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", enable))
     }
 
-    fun initOutgoing() {
+    fun initOutgoing(isScreencast : Boolean = false, projectionResultData: Intent? = null) {
         Log.d(this, "initOutgoing()")
         Utils.checkIsOnMainThread()
 
@@ -294,7 +336,7 @@ class RTCCall : RTCPeerConnection {
             dataChannel = peerConnection!!.createDataChannel("data", init)
             dataChannel!!.registerObserver(dataChannelObserver)
 
-            addTracks()
+            addTracks(isScreencast, projectionResultData)
 
             peerConnection!!.createOffer(object : DefaultSdpObserver() {
                 override fun onCreateSuccess(sessionDescription: SessionDescription) {
@@ -339,10 +381,10 @@ class RTCCall : RTCPeerConnection {
         }
     }
 
-    private fun addTracks() {
+    private fun addTracks(isScreencast : Boolean = false, projectionResultData: Intent? = null) {
         try {
             val rtpSenderAudio = peerConnection!!.addTrack(createAudioTrack(), listOf("stream1"))
-            val rtpSenderVideo = peerConnection!!.addTrack(createVideoTrack(), listOf("stream1"))
+            val rtpSenderVideo = peerConnection!!.addTrack(createVideoTrack(isScreencast, projectionResultData), listOf("stream1"))
 
             // needed to have a high resolution/framerate
             for (encoding in rtpSenderVideo.parameters.encodings) {
@@ -385,17 +427,32 @@ class RTCCall : RTCPeerConnection {
         }
     }
 
-    private fun createVideoTrack(): VideoTrack? {
+    private fun createScreenCapture(projectionResultData: Intent): VideoCapturer? {
+        return ScreenCapturerAndroid(
+            projectionResultData,
+            object : MediaProjection.Callback() {
+                override fun onStop() {
+                    super.onStop()
+                }
+            })
+    }
+
+    private fun createVideoTrack(isScreencast : Boolean = false, projectionResultData: Intent? = null): VideoTrack? {
         videoCapturer = null
 
-        val enumerator = Camera1Enumerator()
-        val deviceName = enumerator.deviceNames.find { enumerator.isFrontFacing(it) }
-        if (deviceName != null) {
-            // select front facing by default
-            videoCapturer = enumerator.createCapturer(deviceName, null)
-            val formats = enumerator.getSupportedFormats(deviceName)
-            // for debug/settings menu
-            callActivity!!.onCameraChange(deviceName, true, formats)
+        if (isScreencast && projectionResultData != null) {
+            videoCapturer = createScreenCapture(projectionResultData)
+        }
+        else {
+            val enumerator = Camera1Enumerator()
+            val deviceName = enumerator.deviceNames.find { enumerator.isFrontFacing(it) }
+            if (deviceName != null) {
+                // select front facing by default
+                videoCapturer = enumerator.createCapturer(deviceName, null)
+                val formats = enumerator.getSupportedFormats(deviceName)
+                // for debug/settings menu
+                callActivity!!.onCameraChange(deviceName, true, formats)
+            }
         }
 
         if (videoCapturer != null) {
@@ -508,17 +565,24 @@ class RTCCall : RTCPeerConnection {
             .createAudioDeviceModule()
     }
 
-    fun initVideo() {
+    //mediaProjection:use system audio
+    fun initVideo(mediaProjection: MediaProjection? = null) {
         Log.d(this, "initVideo()")
         Utils.checkIsOnMainThread()
 
         val settings = binder.getSettings()
         reportStateChange(CallState.WAITING)
 
+        var strFieldTrails = ""
+        if (mediaProjection != null) {
+            strFieldTrails += "WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:50/"
+        }
+
         // must be created in Main/GUI Thread!
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(callActivity!!.getContext())
                 .setEnableInternalTracer(true)
+                .setFieldTrials(strFieldTrails)
                 .createInitializationOptions()
         )
 
@@ -530,7 +594,8 @@ class RTCCall : RTCPeerConnection {
         if (binder.getSettings().videoHardwareAcceleration) {
             val enableIntelVp8Encoder = true
             val enableH264HighProfile = true
-            encoderFactory = DefaultVideoEncoderFactory(eglBase.eglBaseContext, enableIntelVp8Encoder, enableH264HighProfile)
+//            encoderFactory = DefaultVideoEncoderFactory(eglBase.eglBaseContext, enableIntelVp8Encoder, enableH264HighProfile)
+            encoderFactory = HardwareExtendedVideoEncoderFactory(eglBase.eglBaseContext, enableIntelVp8Encoder, enableH264HighProfile)
             decoderFactory = DefaultVideoDecoderFactory(eglBase.eglBaseContext)
         } else {
             encoderFactory = SoftwareVideoEncoderFactory()
@@ -542,6 +607,7 @@ class RTCCall : RTCPeerConnection {
         } else {
             createJavaAudioDevice()
         }
+        adm?.setMediaProjection(mediaProjection)
 
         factory = PeerConnectionFactory.builder()
             .setAudioDeviceModule(adm)
