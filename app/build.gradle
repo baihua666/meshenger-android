@@ -5,7 +5,7 @@ android {
     }
     compileSdkVersion 33
     defaultConfig {
-        minSdkVersion 19
+        minSdkVersion 21
         targetSdkVersion 33
         versionCode 427
         versionName "4.2.7"
@@ -21,8 +21,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 
     flavorDimensions "store"
@@ -45,7 +45,9 @@ dependencies {
     implementation('com.journeyapps:zxing-android-embedded:3.6.0') { transitive = false }
     implementation 'com.google.zxing:core:3.3.3'
 //    implementation 'org.webrtc:google-webrtc:1.0.24064'
-    implementation 'dev.bargen:webrtc-android:115.0.0'
+//    implementation 'dev.bargen:webrtc-android:115.0.0'
+    implementation 'io.github.webrtc-sdk:android:114.5735.10'
+
     implementation 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:2.0.2'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation 'com.android.support:multidex:1.0.3'

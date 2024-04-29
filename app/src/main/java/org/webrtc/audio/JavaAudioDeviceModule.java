@@ -45,6 +45,7 @@ public class JavaAudioDeviceModule implements AudioDeviceModule {
     private AudioTrackErrorCallback audioTrackErrorCallback;
     private AudioRecordErrorCallback audioRecordErrorCallback;
     private SamplesReadyCallback samplesReadyCallback;
+    private PlaybackSamplesReadyCallback playbackSamplesReadyCallback;
     private AudioTrackStateCallback audioTrackStateCallback;
     private AudioRecordStateCallback audioRecordStateCallback;
     private boolean useHardwareAcousticEchoCanceler = isBuiltInAcousticEchoCancelerSupported();
@@ -141,6 +142,11 @@ public class JavaAudioDeviceModule implements AudioDeviceModule {
      */
     public Builder setSamplesReadyCallback(SamplesReadyCallback samplesReadyCallback) {
       this.samplesReadyCallback = samplesReadyCallback;
+      return this;
+    }
+
+    public Builder setPlaybackSamplesReadyCallback(PlaybackSamplesReadyCallback playbackSamplesReadyCallback) {
+      this.playbackSamplesReadyCallback = playbackSamplesReadyCallback;
       return this;
     }
 
@@ -268,9 +274,11 @@ public class JavaAudioDeviceModule implements AudioDeviceModule {
                 audioSource, audioFormat, audioRecordErrorCallback, audioRecordStateCallback,
                 samplesReadyCallback, useHardwareAcousticEchoCanceler, useHardwareNoiseSuppressor);
       }
-      final WebRtcAudioTrack audioOutput =
-          new WebRtcAudioTrack(context, audioManager, audioAttributes, audioTrackErrorCallback,
-              audioTrackStateCallback, useLowLatency, enableVolumeLogger);
+//      final WebRtcAudioTrack audioOutput =
+//          new WebRtcAudioTrack(context, audioManager, audioAttributes, audioTrackErrorCallback,
+//              audioTrackStateCallback, useLowLatency, enableVolumeLogger);
+      WebRtcAudioTrack audioOutput = new WebRtcAudioTrack(this.context, this.audioManager, this.audioAttributes, this.audioTrackErrorCallback, this.audioTrackStateCallback, this.playbackSamplesReadyCallback, this.useLowLatency, this.enableVolumeLogger);
+
       return new JavaAudioDeviceModule(context, audioManager, audioInput, audioOutput,
           inputSampleRate, outputSampleRate, useStereoInput, useStereoOutput);
     }
@@ -335,6 +343,10 @@ public class JavaAudioDeviceModule implements AudioDeviceModule {
     public byte[] getData() {
       return data;
     }
+  }
+
+  public interface PlaybackSamplesReadyCallback {
+    void onWebRtcAudioTrackSamplesReady(AudioSamples var1);
   }
 
   /** Called when new audio samples are ready. This should only be set for debug purposes */
@@ -455,7 +467,7 @@ public class JavaAudioDeviceModule implements AudioDeviceModule {
       AudioManager audioManager, WebRtcAudioRecord audioInput, WebRtcAudioTrack audioOutput,
       int inputSampleRate, int outputSampleRate, boolean useStereoInput, boolean useStereoOutput);
 
-  @Override
+//  @Override
   public void setMediaProjection(MediaProjection mediaProjection){
     audioInput.setMediaProjection(mediaProjection);
   }
