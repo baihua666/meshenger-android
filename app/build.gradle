@@ -47,6 +47,9 @@ dependencies {
 //    implementation 'org.webrtc:google-webrtc:1.0.24064'
 //    implementation 'dev.bargen:webrtc-android:115.0.0'
     implementation 'io.github.webrtc-sdk:android:114.5735.10'
+    //如果出现方法找不到导致的crash，可以尝试使用本地aar(手动删除了aar中的JavaAudioDeviceModule和AudioDeviceModule)
+//    implementation fileTree(include: ['*.aar'], dir: 'libs')
+
 
     implementation 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:2.0.2'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"

@@ -1122,7 +1122,7 @@ class CallActivity : BaseActivity(), RTCCall.CallContext {
         val mediaProjectionManager = baseContext
             .getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         val mediaProjection = mediaProjectionManager.getMediaProjection(
-            resultCode,
+            RESULT_OK,
             Objects.requireNonNull<Intent>(data)
         )
         initCallBase(true, data, mediaProjection)
