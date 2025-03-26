@@ -4,7 +4,7 @@ True P2P voice- and video phone calls without the need for accounts or access to
 
 ******
 
-在原工程上，增加screen share屏幕分享+h265硬编码设置的功能，增加了使用系统内部audio录制(非麦克风)。
+在原工程上，增加screen share屏幕分享+h265硬编码设置的功能，增加了使用系统内部audio录制(非麦克风，其它APP播放的音乐或者游戏等声音)。
 实现方式：业务层使用 ForegroundService + mediaProjection + AudioRecord 录制system audio，不修改webrtc sdk源码。
 ******
 
